@@ -1,2 +1,7 @@
 .history/
 .vscode/
+build/
+sdkconfig.old
+dependencies.lock
+managed_components/
+.espressif/
