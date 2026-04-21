@@ -21,15 +21,15 @@ bool dht22_read(int gpio_pin, dht22_reading_t *out) {
     // --- send start signal ---
     gpio_set_direction(gpio_pin, GPIO_MODE_OUTPUT);
     gpio_set_level(gpio_pin, 0);
-    vTaskDelay(pdMS_TO_TICKS(2));   // pull low for >1ms
+    vTaskDelay(pdMS_TO_TICKS(2));
     gpio_set_level(gpio_pin, 1);
-    esp_rom_delay_us(30);           // pull high for 20-40us
+    esp_rom_delay_us(30);
     gpio_set_direction(gpio_pin, GPIO_MODE_INPUT);
 
     // --- wait for sensor response ---
-    if (wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US) < 0) return false; // sensor pulls low
-    if (wait_for_level(gpio_pin, 1, DHT22_TIMEOUT_US) < 0) return false; // sensor pulls high
-    if (wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US) < 0) return false; // sensor pulls low again
+    if (wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US) < 0) return false;
+    if (wait_for_level(gpio_pin, 1, DHT22_TIMEOUT_US) < 0) return false;
+    if (wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US) < 0) return false;
 
     // --- read 40 bits ---
     for (int i = 0; i < 40; i++) {
@@ -38,7 +38,7 @@ bool dht22_read(int gpio_pin, dht22_reading_t *out) {
         if (duration < 0) return false;
 
         data[i / 8] <<= 1;
-        if (duration > 40) data[i / 8] |= 1;  // >40us = bit 1, <40us = bit 0
+        if (duration > 40) data[i / 8] |= 1;
     }
 
     // --- verify checksum ---
@@ -48,7 +48,7 @@ bool dht22_read(int gpio_pin, dht22_reading_t *out) {
     // --- decode ---
     out->humidity    = ((data[0] << 8) | data[1]) / 10.0f;
     out->temperature = (((data[2] & 0x7F) << 8) | data[3]) / 10.0f;
-    if (data[2] & 0x80) out->temperature *= -1;  // negative temp flag
+    if (data[2] & 0x80) out->temperature *= -1;
 
     return true;
 }
