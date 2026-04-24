@@ -86,15 +86,3 @@ CREATE TABLE sensor_readings (
 | `CERTBOT_EMAIL`  | Email for Let's Encrypt expiry notices             |
 
 Every push to `main` → builds `subscriber` + `certbot` images → pushes to GHCR → SSHes into E2 → rolling restart of `certbot` and `subscriber` only (Mosquitto stays up and gets SIGHUP from certbot when certs change).
-
----
-
-## Publish a test message
-
-```bash
-# From any machine that trusts the Let's Encrypt CA (all modern OSes do)
-mosquitto_pub \
-  -h satec.duckdns.org -p 8883 \
-  -t sensors/dht22 \
-  -m '{"temp":23.3,"humidity":75.3,"timestamp":"2026-04-24T05:40:43Z"}'
-```
