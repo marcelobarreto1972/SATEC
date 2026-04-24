@@ -1,0 +1,159 @@
+name: Build & Deploy to Micro E2
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_SUBSCRIBER: ghcr.io/${{ github.repository_owner }}/mqtt-subscriber
+  IMAGE_CERTBOT:    ghcr.io/${{ github.repository_owner }}/mqtt-certbot
+
+jobs:
+  # ── 1. Lint & test ──────────────────────────────────────────────────────────
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r subscriber/requirements.txt
+          pip install ruff
+
+      - name: Lint (ruff)
+        run: ruff check subscriber/
+
+  # ── 2. Build & push images ──────────────────────────────────────────────────
+  build:
+    name: Build & Push Images
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata (subscriber)
+        id: meta-subscriber
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_SUBSCRIBER }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Extract metadata (certbot)
+        id: meta-certbot
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_CERTBOT }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build & push subscriber
+        uses: docker/build-push-action@v5
+        with:
+          context: ./subscriber
+          push: true
+          tags: ${{ steps.meta-subscriber.outputs.tags }}
+          labels: ${{ steps.meta-subscriber.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push certbot
+        uses: docker/build-push-action@v5
+        with:
+          context: ./certbot
+          push: true
+          tags: ${{ steps.meta-certbot.outputs.tags }}
+          labels: ${{ steps.meta-certbot.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 3. Deploy to Micro E2 ───────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Micro E2
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: tag
+        run: echo "sha_tag=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Write SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.E2_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.E2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy compose file to E2
+        run: |
+          scp -i ~/.ssh/id_ed25519 docker-compose.yml \
+            ${{ secrets.E2_USER }}@${{ secrets.E2_HOST }}:~/mqtt-neon/docker-compose.yml
+
+      - name: Deploy on E2
+        env:
+          SHA_TAG:        ${{ steps.tag.outputs.sha_tag }}
+          NEON_DSN:       ${{ secrets.NEON_DSN }}
+          DUCKDNS_TOKEN:  ${{ secrets.DUCKDNS_TOKEN }}
+          CERTBOT_EMAIL:  ${{ secrets.CERTBOT_EMAIL }}
+          E2_HOST:        ${{ secrets.E2_HOST }}
+          E2_USER:        ${{ secrets.E2_USER }}
+          REPO_OWNER:     ${{ github.repository_owner }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${E2_USER}@${E2_HOST} bash <<EOF
+            set -euo pipefail
+            cd ~/mqtt-neon
+
+            # Pull updated images
+            docker pull ghcr.io/${REPO_OWNER}/mqtt-subscriber:${SHA_TAG}
+            docker pull ghcr.io/${REPO_OWNER}/mqtt-certbot:${SHA_TAG}
+
+            # Write .env (never stored in git)
+            cat > .env <<ENVEOF
+          NEON_DSN=${NEON_DSN}
+          DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+          CERTBOT_EMAIL=${CERTBOT_EMAIL}
+          DOMAIN=satec.duckdns.org
+          ENVEOF
+
+            # Rolling restart — certbot and subscriber only.
+            # Mosquitto is NOT restarted; certbot sends it SIGHUP after renewal.
+            IMAGE_TAG=${SHA_TAG} \
+              docker compose up -d --pull always --no-build certbot subscriber
+
+            docker image prune -f
+          EOF
+
+# ── Required GitHub Secrets ────────────────────────────────────────────────────
+# E2_HOST         — IP or hostname of your Micro E2
+# E2_USER         — SSH user (e.g. ubuntu)
+# E2_SSH_KEY      — private SSH key (ed25519)
+# NEON_DSN        — postgres://user:pass@host/db?sslmode=require
+# DUCKDNS_TOKEN   — your DuckDNS token
+# CERTBOT_EMAIL   — email for Let's Encrypt expiry notices

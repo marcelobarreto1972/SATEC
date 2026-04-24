@@ -1,0 +1,80 @@
+services:
+
+  # ── 1. Certbot — obtains & renews Let's Encrypt cert via DuckDNS DNS-01 ────
+  certbot:
+    build:
+      context: ./certbot
+    container_name: certbot
+    restart: unless-stopped
+    environment:
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN}
+      DOMAIN: ${DOMAIN:-satec.duckdns.org}
+      EMAIL: ${CERTBOT_EMAIL}
+      # How often the renewal loop checks (seconds). LE certs expire in 90 days;
+      # certbot only renews when < 30 days remain, so checking daily is fine.
+      RENEW_INTERVAL: ${RENEW_INTERVAL:-86400}
+    volumes:
+      - letsencrypt:/etc/letsencrypt          # certs live here
+      - certbot_logs:/var/log/letsencrypt
+      # Docker socket lets the entrypoint send SIGHUP to Mosquitto after renewal
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "test", "-f",
+             "/etc/letsencrypt/live/${DOMAIN:-satec5.duckdns.org}/fullchain.pem"]
+      interval: 10s
+      timeout: 5s
+      retries: 30        # wait up to ~5 min for first issuance
+      start_period: 10s
+
+  # ── 2. Mosquitto — TLS via Let's Encrypt cert ────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mosquitto
+    restart: unless-stopped
+    depends_on:
+      certbot:
+        condition: service_healthy
+    ports:
+      - "8883:8883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: >
+        mosquitto_sub
+          -h localhost -p 8883
+          --cafile /etc/letsencrypt/live/${DOMAIN:-satec5.duckdns.org}/chain.pem
+          -t "$$SYS/#" -C 1 -i healthcheck -W 3
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── 3. Subscriber — MQTT → NeonDB ────────────────────────────────────────────
+  app:
+    build:
+      context: ./app
+    container_name: mqtt-app
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "8883"
+      MQTT_TOPIC: sensors/dht22
+      MQTT_CLIENT_ID: subscriber-01
+      # LE chain — trusted by the system CA bundle, but we pin ours for clarity
+      MQTT_CA_CERT: /etc/letsencrypt/live/${DOMAIN:-satec5.duckdns.org}/chain.pem
+      MQTT_CLIENT_CERT: ""
+      MQTT_CLIENT_KEY: ""
+      NEON_DSN: ${NEON_DSN}
+    volumes:
+      - letsencrypt:/etc/letsencrypt:ro
+
+volumes:
+  letsencrypt:
+  certbot_logs:
+  mosquitto_data:
+  mosquitto_log:
