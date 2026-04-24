@@ -139,7 +139,7 @@ jobs:
           NEON_DSN=${NEON_DSN}
           DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
           CERTBOT_EMAIL=${CERTBOT_EMAIL}
-          DOMAIN=satec.duckdns.org
+          DOMAIN=satec5.duckdns.org
           ENVEOF
 
             # Rolling restart — certbot and subscriber only.
