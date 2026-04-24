@@ -5,7 +5,7 @@
 #include "freertos/task.h"
 #include <string.h>
 
-#define DHT22_TIMEOUT_US 200
+#define DHT22_TIMEOUT_US 2000
 
 static int64_t wait_for_level(int gpio_pin, int level, int64_t timeout_us) {
     int64_t start = esp_timer_get_time();
@@ -15,40 +15,65 @@ static int64_t wait_for_level(int gpio_pin, int level, int64_t timeout_us) {
     return esp_timer_get_time() - start;
 }
 
-bool dht22_read(int gpio_pin, dht22_reading_t *out) {
+dht22_err_t dht22_read(int gpio_pin, dht22_reading_t *out) {
     uint8_t data[5] = {0};
 
-    // --- send start signal ---
+    // wake-up: ensure line settles high before pulling low
+    gpio_set_direction(gpio_pin, GPIO_MODE_INPUT);
+    esp_rom_delay_us(500);
+
+    // send start signal
     gpio_set_direction(gpio_pin, GPIO_MODE_OUTPUT);
     gpio_set_level(gpio_pin, 0);
-    vTaskDelay(pdMS_TO_TICKS(2));
+    vTaskDelay(pdMS_TO_TICKS(20));  // hold low 20ms
     gpio_set_level(gpio_pin, 1);
-    esp_rom_delay_us(30);
+    esp_rom_delay_us(40);           // hold high 40us
     gpio_set_direction(gpio_pin, GPIO_MODE_INPUT);
 
-    // --- wait for sensor response ---
-    if (wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US) < 0) return false;
-    if (wait_for_level(gpio_pin, 1, DHT22_TIMEOUT_US) < 0) return false;
-    if (wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US) < 0) return false;
+    portDISABLE_INTERRUPTS();
 
-    // --- read 40 bits ---
-    for (int i = 0; i < 40; i++) {
-        if (wait_for_level(gpio_pin, 1, DHT22_TIMEOUT_US) < 0) return false;
-        int64_t duration = wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US);
-        if (duration < 0) return false;
+    bool timeout = false;
+    if (wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US) < 0) timeout = true;
+    if (!timeout && wait_for_level(gpio_pin, 1, DHT22_TIMEOUT_US) < 0) timeout = true;
+    if (!timeout && wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US) < 0) timeout = true;
 
-        data[i / 8] <<= 1;
-        if (duration > 40) data[i / 8] |= 1;
+    if (!timeout) {
+        for (int i = 0; i < 40; i++) {
+            if (wait_for_level(gpio_pin, 1, DHT22_TIMEOUT_US) < 0) { timeout = true; break; }
+            int64_t duration = wait_for_level(gpio_pin, 0, DHT22_TIMEOUT_US);
+            if (duration < 0) { timeout = true; break; }
+            data[i / 8] <<= 1;
+            if (duration > 40) data[i / 8] |= 1;
+        }
     }
 
-    // --- verify checksum ---
+    portENABLE_INTERRUPTS();
+
+    if (timeout) return DHT22_ERR_TIMEOUT;
+
+    // checksum
     uint8_t checksum = data[0] + data[1] + data[2] + data[3];
-    if (checksum != data[4]) return false;
+    if (checksum != data[4]) return DHT22_ERR_CHECKSUM;
 
-    // --- decode ---
-    out->humidity    = ((data[0] << 8) | data[1]) / 10.0f;
-    out->temperature = (((data[2] & 0x7F) << 8) | data[3]) / 10.0f;
-    if (data[2] & 0x80) out->temperature *= -1;
+    float humidity    = ((data[0] << 8) | data[1]) / 10.0f;
+    float temperature = (((data[2] & 0x7F) << 8) | data[3]) / 10.0f;
+    if (data[2] & 0x80) temperature *= -1;
 
-    return true;
+    // sanity check — DHT22 physical limits
+    if (humidity < 0.0f || humidity > 100.0f) return DHT22_ERR_RANGE;
+    if (temperature < -40.0f || temperature > 80.0f) return DHT22_ERR_RANGE;
+
+    out->humidity    = humidity;
+    out->temperature = temperature;
+    return DHT22_OK;
+}
+
+const char *dht22_err_str(dht22_err_t err) {
+    switch (err) {
+        case DHT22_OK:           return "OK";
+        case DHT22_ERR_TIMEOUT:  return "TIMEOUT";
+        case DHT22_ERR_CHECKSUM: return "CHECKSUM";
+        case DHT22_ERR_RANGE:    return "RANGE";
+        default:                 return "UNKNOWN";
+    }
 }

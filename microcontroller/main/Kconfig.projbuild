@@ -1,0 +1,33 @@
+menu "App Configuration"
+
+    config WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+        help
+            WiFi network name to connect to.
+
+    config WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+        help
+            WiFi network password.
+
+    config MQTT_BROKER_URI
+        string "MQTT Broker URI"
+        default "mqtts://your.broker.org"
+        help
+            Full URI of the MQTT broker including scheme.
+
+    config MQTT_USERNAME
+        string "MQTT Username"
+        default ""
+        help
+            MQTT broker username.
+
+    config MQTT_PASSWORD
+        string "MQTT Password"
+        default ""
+        help
+            MQTT broker password.
+
+endmenu

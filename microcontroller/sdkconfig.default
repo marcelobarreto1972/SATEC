@@ -1,0 +1,5 @@
+CONFIG_WIFI_SSID="changeme"
+CONFIG_WIFI_PASSWORD="changeme"
+CONFIG_MQTT_BROKER_URI="mqtts://changeme"
+CONFIG_MQTT_USERNAME="changeme"
+CONFIG_MQTT_PASSWORD="changeme"
