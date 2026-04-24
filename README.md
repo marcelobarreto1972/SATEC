@@ -20,7 +20,7 @@ In your cloud provider's firewall / security group, allow inbound TCP **8883**.
 
 ### 2. Point DuckDNS to your E2's IP
 
-Log into https://duckdns.org and make sure `satec.duckdns.org` points to your E2's public IP. The certbot container will call the DuckDNS API automatically to satisfy the DNS-01 challenge.
+Log into https://duckdns.org and make sure `satec5.duckdns.org` points to your E2's public IP. The certbot container will call the DuckDNS API automatically to satisfy the DNS-01 challenge.
 
 ### 3. Clone the repo & create `.env`
 
