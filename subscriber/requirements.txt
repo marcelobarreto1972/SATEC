@@ -1,2 +1,2 @@
 paho-mqtt==2.1.0
-psycopg[c]==3.2.3
+psycopg==3.2.3
