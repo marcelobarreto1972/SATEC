@@ -24,7 +24,8 @@ import logging
 import os
 import signal
 import sys
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 
 import psycopg
 import paho.mqtt.client as mqtt
@@ -49,21 +50,21 @@ NEON_DSN         = os.environ["NEON_DSN"]   # mandatory — fail fast if missing
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DDL = """
-    CREATE TABLE IF NOT EXISTS sensor_readings (
-        id          BIGSERIAL PRIMARY KEY,
-        device_ts   TIMESTAMPTZ NOT NULL,
-        received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        temp        NUMERIC(6, 2) NOT NULL,
-        humidity    NUMERIC(6, 2) NOT NULL
-    );
+CREATE TABLE IF NOT EXISTS sensor_readings (
+    id          BIGSERIAL PRIMARY KEY,
+    device_ts   TIMESTAMPTZ NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    temp        NUMERIC(6, 2) NOT NULL,
+    humidity    NUMERIC(6, 2) NOT NULL
+);
 
-    CREATE INDEX IF NOT EXISTS idx_sensor_readings_device_ts
-        ON sensor_readings (device_ts DESC);
+CREATE INDEX IF NOT EXISTS idx_sensor_readings_device_ts
+    ON sensor_readings (device_ts DESC);
 """
 
 INSERT = """
-    INSERT INTO sensor_readings (device_ts, temp, humidity)
-    VALUES (%(device_ts)s, %(temp)s, %(humidity)s)
+INSERT INTO sensor_readings (device_ts, temp, humidity)
+VALUES (%(device_ts)s, %(temp)s, %(humidity)s)
 """
 
 

@@ -3,14 +3,13 @@ services:
   # ── 1. Certbot — obtains & renews Let's Encrypt cert via DuckDNS DNS-01 ────
   certbot:
     image: ghcr.io/marcelobarreto1972/mqtt-certbot:latest
-
     build:
       context: ./certbot
     container_name: certbot
     restart: unless-stopped
     environment:
       DUCKDNS_TOKEN: ${DUCKDNS_TOKEN}
-      DOMAIN: ${DOMAIN:-satec.duckdns.org}
+      DOMAIN: ${DOMAIN:-satec5.duckdns.org}
       EMAIL: ${CERTBOT_EMAIL}
       # How often the renewal loop checks (seconds). LE certs expire in 90 days;
       # certbot only renews when < 30 days remain, so checking daily is fine.
@@ -54,14 +53,14 @@ services:
   subscriber:
     image: ghcr.io/marcelobarreto1972/mqtt-subscriber:latest
     build:
-      context: ./app
-    container_name: mqtt-app
+      context: ./subscriber
+    container_name: mqtt-subscriber
     restart: unless-stopped
     depends_on:
       mosquitto:
         condition: service_healthy
     environment:
-      MQTT_HOST: mosquitto
+      MQTT_HOST: ${DOMAIN:-satec5.duckdns.org}  # use public domain for TLS hostname verification
       MQTT_PORT: "8883"
       MQTT_TOPIC: sensors/dht22
       MQTT_CLIENT_ID: subscriber-01
