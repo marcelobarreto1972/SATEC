@@ -104,7 +104,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set image tag
         id: tag
@@ -117,10 +117,18 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.E2_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Copy compose file to E2
+      - name: Prepare remote directories
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+            ${{ secrets.E2_USER }}@${{ secrets.E2_HOST }} \
+            "mkdir -p ~/mqtt-neon/mosquitto/config"
+
+      - name: Copy files to E2
         run: |
           scp -i ~/.ssh/id_ed25519 docker-compose.yml \
             ${{ secrets.E2_USER }}@${{ secrets.E2_HOST }}:~/mqtt-neon/docker-compose.yml
+          scp -i ~/.ssh/id_ed25519 mosquitto/config/mosquitto.conf \
+            ${{ secrets.E2_USER }}@${{ secrets.E2_HOST }}:~/mqtt-neon/mosquitto/config/mosquitto.conf
 
       - name: Deploy on E2
         env:
