@@ -52,7 +52,7 @@ services:
       retries: 3
 
   # ── 3. Subscriber — MQTT → NeonDB ────────────────────────────────────────────
-  app:
+  subscriber:
     build:
       context: ./app
     container_name: mqtt-app
