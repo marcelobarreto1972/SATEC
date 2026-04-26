@@ -2,6 +2,8 @@ services:
 
   # ── 1. Certbot — obtains & renews Let's Encrypt cert via DuckDNS DNS-01 ────
   certbot:
+    image: ghcr.io/marcelobarreto1972/mqtt-certbot:latest
+
     build:
       context: ./certbot
     container_name: certbot
@@ -53,6 +55,7 @@ services:
 
   # ── 3. Subscriber — MQTT → NeonDB ────────────────────────────────────────────
   subscriber:
+    image: ghcr.io/marcelobarreto1972/mqtt-subscriber:latest
     build:
       context: ./app
     container_name: mqtt-app
