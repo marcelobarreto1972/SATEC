@@ -47,14 +47,14 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Extract metadata (subscriber)
         id: meta-subscriber
@@ -67,7 +67,7 @@ jobs:
 
       - name: Extract metadata (certbot)
         id: meta-certbot
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE_CERTBOT }}
           tags: |
@@ -75,7 +75,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build & push subscriber
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./subscriber
           push: true
@@ -153,7 +153,7 @@ jobs:
           NEON_DSN=${NEON_DSN}
           DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
           CERTBOT_EMAIL=${CERTBOT_EMAIL}
-          DOMAIN=satec.duckdns.org
+          DOMAIN=satec5.duckdns.org
           ENVEOF
 
             # Rolling restart — certbot and subscriber only.
