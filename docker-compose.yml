@@ -44,14 +44,11 @@ services:
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     healthcheck:
-      test: >
-        mosquitto_sub
-          -h localhost -p 8883
-          --cafile /etc/letsencrypt/live/${DOMAIN:-satec5.duckdns.org}/chain.pem
-          -t "$$SYS/#" -C 1 -i healthcheck -W 3
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "nc -z localhost 8883 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
 
   # ── 3. Subscriber — MQTT → NeonDB ────────────────────────────────────────────
   subscriber:
