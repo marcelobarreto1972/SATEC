@@ -71,7 +71,6 @@ CREATE TABLE sensor_readings (
     humidity    NUMERIC(6, 2) NOT NULL
 );
 ```
-
 ---
 
 ## GitHub Actions secrets
