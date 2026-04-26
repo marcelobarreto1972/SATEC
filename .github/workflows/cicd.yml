@@ -8,23 +8,27 @@ env:
   REGISTRY: ghcr.io
   IMAGE_SUBSCRIBER: ghcr.io/${{ github.repository_owner }}/mqtt-subscriber
   IMAGE_CERTBOT:    ghcr.io/${{ github.repository_owner }}/mqtt-certbot
+  # Opt into Node.js 24 now to avoid deprecation failures after June 2026
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ── 1. Lint & test ──────────────────────────────────────────────────────────
   test:
     name: Lint & Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read        # required for actions/checkout
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install dependencies
         run: |
-          pip install -r subscriber/requirements.txt
+          pip install -r subscriber/requirements-ci.txt
           pip install ruff
 
       - name: Lint (ruff)
@@ -40,7 +44,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -96,6 +100,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -139,7 +145,7 @@ jobs:
           NEON_DSN=${NEON_DSN}
           DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
           CERTBOT_EMAIL=${CERTBOT_EMAIL}
-          DOMAIN=satec5.duckdns.org
+          DOMAIN=satec.duckdns.org
           ENVEOF
 
             # Rolling restart — certbot and subscriber only.
