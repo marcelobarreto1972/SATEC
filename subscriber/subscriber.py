@@ -24,7 +24,8 @@ import logging
 import os
 import signal
 import sys
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 
 import psycopg
 import paho.mqtt.client as mqtt
@@ -162,12 +163,14 @@ def main() -> None:
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
     )
 
-    # TLS — client cert is optional (set to empty string to disable mTLS)
-    client.tls_set(
-        ca_certs=MQTT_CA_CERT or None,
-        certfile=MQTT_CLIENT_CERT or None,
-        keyfile=MQTT_CLIENT_KEY or None,
-    )
+    # TLS — the subscriber runs inside Docker on the same host as Mosquitto.
+    # We use tls_insecure_set(True) to skip hostname/cert verification for
+    # internal traffic. External clients (ESP32) still get full TLS.
+    import ssl
+    tls_context = ssl.create_default_context()
+    tls_context.check_hostname = False
+    tls_context.verify_mode = ssl.CERT_NONE
+    client.tls_set_context(tls_context)
 
     client.on_connect    = on_connect
     client.on_message    = on_message

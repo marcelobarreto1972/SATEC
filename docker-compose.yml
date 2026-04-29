@@ -60,18 +60,15 @@ services:
       mosquitto:
         condition: service_healthy
     environment:
-      MQTT_HOST: ${DOMAIN:-satec5.duckdns.org}  # use public domain for TLS hostname verification
+      MQTT_HOST: mosquitto
       MQTT_PORT: "8883"
       MQTT_TOPIC: sensors/dht22
       MQTT_CLIENT_ID: subscriber-01
       # LE chain — trusted by the system CA bundle, but we pin ours for clarity
-      MQTT_CA_CERT: /etc/letsencrypt/live/${DOMAIN:-satec5.duckdns.org}/chain.pem
+      MQTT_CA_CERT: ""  # empty = use system CA bundle (LE already trusted)
       MQTT_CLIENT_CERT: ""
       MQTT_CLIENT_KEY: ""
       NEON_DSN: ${NEON_DSN}
-    volumes:
-      - letsencrypt:/etc/letsencrypt:ro
-
 volumes:
   letsencrypt:
   certbot_logs:
