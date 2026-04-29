@@ -24,8 +24,7 @@ import logging
 import os
 import signal
 import sys
-import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 import psycopg
 import paho.mqtt.client as mqtt
